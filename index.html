@@ -13,13 +13,14 @@ body{
   background:#f2f2f2;
   margin:16px;
 }
+
 .topbar{
   max-width:1200px;
   margin:0 auto 14px;
   display:flex;
   gap:10px;
-  align-items:center;
 }
+
 button{
   padding:10px 16px;
   font-size:15px;
@@ -31,11 +32,6 @@ button{
 .reset{background:#c9302c}
 .pdf{background:#0275d8}
 
-select{
-  padding:9px;
-  font-size:14px;
-}
-
 .wrapper{
   max-width:1200px;
   margin:0 auto;
@@ -43,6 +39,7 @@ select{
   padding:14px;
   border-radius:10px;
 }
+
 .grid{
   display:grid;
   grid-template-columns:repeat(2,1fr);
@@ -51,27 +48,33 @@ select{
 @media(max-width:900px){
   .grid{grid-template-columns:1fr}
 }
+
 .card{
   border:1px solid #ddd;
   border-radius:10px;
   padding:10px;
 }
+
 .cardHeader{
   display:flex;
   justify-content:space-between;
   align-items:center;
   margin-bottom:6px;
 }
+
 .preview{
   width:192mm;
   height:38mm;
   border:1px dashed #999;
   margin-bottom:6px;
+  background:#fff;
 }
+
 canvas{
   width:192mm;
   height:38mm;
 }
+
 input, textarea{
   width:100%;
   font-size:14px;
@@ -81,6 +84,7 @@ input, textarea{
   box-sizing:border-box;
   margin-top:6px;
 }
+
 textarea{
   min-height:110px;
   resize:vertical;
@@ -93,17 +97,6 @@ textarea{
 
 <div class="topbar">
   <button class="reset" onclick="resetAll()">Reset</button>
-
-  <select id="startPos">
-    <option value="0">Start bei Position 1</option>
-    <option value="1">Start bei Position 2</option>
-    <option value="2">Start bei Position 3</option>
-    <option value="3">Start bei Position 4</option>
-    <option value="4">Start bei Position 5</option>
-    <option value="5">Start bei Position 6</option>
-    <option value="6">Start bei Position 7</option>
-  </select>
-
   <button class="pdf" onclick="makePDF()">PDF erstellen</button>
 </div>
 
@@ -115,6 +108,7 @@ textarea{
 const LABELS = 7;
 const grid = document.getElementById("grid");
 
+// UI aufbauen
 for(let i=1;i<=LABELS;i++){
   grid.insertAdjacentHTML("beforeend",`
     <div class="card">
@@ -127,17 +121,20 @@ for(let i=1;i<=LABELS;i++){
         <canvas id="c${i}" width="1152" height="228"></canvas>
       </div>
 
-      <textarea id="h${i}" placeholder="Überschrift (3 Spalten mit --- trennen)" oninput="update(${i})"></textarea>
-      <textarea id="t${i}" placeholder="Freitext – Linien erscheinen im Druck" oninput="update(${i})"></textarea>
-      <input id="n${i}" placeholder="Nummer unten (z. B. 01)" oninput="update(${i})">
+      <textarea id="h${i}" placeholder="Überschrift" oninput="update(${i})"></textarea>
+      <textarea id="t${i}" placeholder="Freitext" oninput="update(${i})"></textarea>
+      <input id="n${i}" placeholder="Nummer unten" oninput="update(${i})">
     </div>
   `);
+
   update(i);
 }
 
 function resetAll(){
   for(let i=1;i<=LABELS;i++){
-    ["h","t","n"].forEach(p=>document.getElementById(p+i).value="");
+    document.getElementById("h"+i).value="";
+    document.getElementById("t"+i).value="";
+    document.getElementById("n"+i).value="";
     document.getElementById("p"+i).checked=false;
     update(i);
   }
@@ -145,94 +142,71 @@ function resetAll(){
 
 function update(i){
   const ctx = document.getElementById("c"+i).getContext("2d");
-  drawLabel(
-    ctx,
-    document.getElementById("h"+i).value,
-    document.getElementById("t"+i).value,
-    document.getElementById("n"+i).value
-  );
-}
 
-function drawLabel(ctx, header, text, number){
-  ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
+  ctx.clearRect(0,0,1152,228);
   ctx.fillStyle="#fff";
-  ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
+  ctx.fillRect(0,0,1152,228);
 
   ctx.save();
-  ctx.translate(0, ctx.canvas.height);
+  ctx.translate(0,228);
   ctx.rotate(-Math.PI/2);
 
-  const labelWidth  = ctx.canvas.height;
-  const labelHeight = ctx.canvas.width;
-
-  let y = 10;
-
-  if(header){
-    const cols = header.split(/\n---\n?/);
-    const colWidth = (labelWidth - 40) / 3;
-    ctx.font="bold 26px Arial";
-    for(let c=0;c<3;c++){
-      let yy=y;
-      (cols[c]||"").split("\n").forEach(line=>{
-        ctx.fillText(line,14+c*colWidth,yy);
-        yy+=28;
-      });
-    }
-    y+=52;
-  }
+  ctx.font="bold 28px Arial";
+  ctx.fillStyle="#000";
+  ctx.fillText(document.getElementById("h"+i).value,14,10);
 
   ctx.font="20px Arial";
-  const rows=text.split("\n");
-  const lineHeight=34;
-  const maxLines=Math.floor((labelHeight-y-42)/lineHeight);
+  ctx.fillText(document.getElementById("t"+i).value,14,60);
 
-  for(let i=0;i<maxLines;i++){
-    if(rows[i]) ctx.fillText(rows[i],14,y);
-    ctx.beginPath();
-    ctx.moveTo(8,y+lineHeight-6);
-    ctx.lineTo(labelWidth-8,y+lineHeight-6);
-    ctx.stroke();
-    y+=lineHeight;
-  }
+  ctx.font="bold 22px Arial";
+  ctx.textAlign="center";
+  ctx.fillText(
+    document.getElementById("n"+i).value,
+    96,
+    1080
+  );
 
-  if(number){
-    ctx.font="bold 22px Arial";
-    ctx.textAlign="center";
-    ctx.fillText(number,labelWidth/2,labelHeight-28);
-  }
   ctx.restore();
 }
 
-const mm=v=>v*2.83465;
+// mm → pt
+const mm = v => v * 2.83465;
 
+// PDF – Feste Positionen pro Ordner
 async function makePDF(){
-  const pdf=await PDFLib.PDFDocument.create();
-  const page=pdf.addPage([595,842]);
+  const pdf = await PDFLib.PDFDocument.create();
+  const page = pdf.addPage([595,842]); // A4
 
-  const left=(210-192)/2;
-  const top=(297-7*38)/2;
-
-  let slot=Number(document.getElementById("startPos").value);
+  const left = (210-192)/2;
+  const top  = (297-7*38)/2;
 
   for(let i=1;i<=LABELS;i++){
-    if(!document.getElementById("p"+i).checked) continue;
-    const canvas=document.getElementById("c"+i);
-    const img=await pdf.embedPng(canvas.toDataURL());
+    const checkbox = document.getElementById("p"+i);
+    if(!checkbox || !checkbox.checked) continue;
+
+    const canvas = document.getElementById("c"+i);
+    const img = await pdf.embedPng(canvas.toDataURL("image/png"));
+
+    const slot = i - 1; // <<< FIX: feste Position
+
     page.drawImage(img,{
-      x:mm(left),
-      y:842-mm(top+(slot+1)*38),
-      width:mm(192),
-      height:mm(38)
+      x: mm(left),
+      y: 842 - mm(top + (slot + 1) * 38),
+      width: mm(192),
+      height: mm(38)
     });
-    slot++;
   }
 
-  const bytes=await pdf.save();
-  const blob=new Blob([bytes],{type:"application/pdf"});
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download="Ordneretiketten_38x192.pdf";
+  const bytes = await pdf.save();
+  const blob = new Blob([bytes],{type:"application/pdf"});
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "Ordneretiketten_38x192.pdf";
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
 }
 </script>
 
