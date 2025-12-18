@@ -13,12 +13,14 @@ body{
   background:#f2f2f2;
   margin:16px;
 }
+
 .topbar{
   max-width:1200px;
   margin:0 auto 14px;
   display:flex;
   gap:10px;
 }
+
 button{
   padding:10px 16px;
   font-size:15px;
@@ -65,6 +67,7 @@ button{
   height:38mm;
   border:1px dashed #999;
   margin-bottom:6px;
+  background:#fff;
 }
 
 canvas{
@@ -74,21 +77,17 @@ canvas{
 
 input, textarea{
   width:100%;
+  font-size:14px;
+  padding:6px;
+  border-radius:6px;
+  border:1px solid #ccc;
   box-sizing:border-box;
   margin-top:6px;
-  padding:8px;
-  font-family:Arial;
-}
-
-input{
-  font-size:18px;
-  font-weight:bold;
 }
 
 textarea{
-  min-height:140px;
+  min-height:110px;
   resize:vertical;
-  font-size:14px;
   white-space:pre;
 }
 </style>
@@ -109,6 +108,7 @@ textarea{
 const LABELS = 7;
 const grid = document.getElementById("grid");
 
+// UI
 for(let i=1;i<=LABELS;i++){
   grid.insertAdjacentHTML("beforeend",`
     <div class="card">
@@ -121,10 +121,9 @@ for(let i=1;i<=LABELS;i++){
         <canvas id="c${i}" width="1152" height="228"></canvas>
       </div>
 
-      <input id="h${i}" placeholder="Überschrift (z. B. Haus 2021)" oninput="update(${i})">
-      <textarea id="t${i}" placeholder="Freitext / Unterschriften (--- = neue Spalte)"
-        oninput="update(${i})"></textarea>
-      <input id="n${i}" value="${String(i).padStart(2,'0')}" oninput="update(${i})">
+      <textarea id="h${i}" placeholder="Überschrift (--- = neue Spalte)" oninput="update(${i})"></textarea>
+      <textarea id="t${i}" placeholder="Freitext – Linien erscheinen im Druck" oninput="update(${i})"></textarea>
+      <input id="n${i}" placeholder="Nummer unten (z. B. 01)" oninput="update(${i})">
     </div>
   `);
 
@@ -135,14 +134,16 @@ function resetAll(){
   for(let i=1;i<=LABELS;i++){
     document.getElementById("h"+i).value="";
     document.getElementById("t"+i).value="";
-    document.getElementById("n"+i).value=String(i).padStart(2,'0');
+    document.getElementById("n"+i).value="";
     document.getElementById("p"+i).checked=false;
     update(i);
   }
 }
 
 function update(i){
-  const ctx = document.getElementById("c"+i).getContext("2d");
+  const canvas = document.getElementById("c"+i);
+  const ctx = canvas.getContext("2d");
+
   drawLabel(
     ctx,
     document.getElementById("h"+i).value,
@@ -151,6 +152,7 @@ function update(i){
   );
 }
 
+// ZEICHNEN
 function drawLabel(ctx, header, text, number){
   ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
   ctx.fillStyle="#fff";
@@ -160,43 +162,65 @@ function drawLabel(ctx, header, text, number){
   ctx.translate(0, ctx.canvas.height);
   ctx.rotate(-Math.PI/2);
 
-  // Überschrift
-  ctx.font="bold 26px Arial";
-  ctx.textAlign="left";
-  ctx.fillStyle="#000";
-  ctx.fillText(header, 10, 10);
+  const paddingTop = 10;
+  const headerHeight = 46;
+  const paddingBottom = 42;
+  const lineHeight = 34;
 
-  // Spalten-Text
-  const cols = text.split(/\n---\n?/);
-  const colCount = 3;
-  const colGap = 12;
-  const top = 50;
-  const bottom = ctx.canvas.width - 60;
-  const colWidth = (ctx.canvas.height - colGap*(colCount-1) - 16) / colCount;
-  const lineHeight = 32;
-  const linesPerCol = Math.floor((bottom-top)/lineHeight);
+  let y = paddingTop;
 
-  ctx.font="18px Arial";
+  // === ÜBERSCHRIFT: 3 SPALTEN ===
+  if(header){
+    const cols = header.split(/\n---\n?/);
+    const colWidth = (ctx.canvas.height - 40) / 3;
 
-  for(let c=0;c<colCount;c++){
-    const x = 8 + c*(colWidth+colGap);
-    let y = top;
-    const rows = (cols[c]||"").split("\n");
+    ctx.font="bold 26px Arial";
+    ctx.textBaseline="top";
 
-    for(let l=0;l<linesPerCol;l++){
-      if(rows[l]) ctx.fillText(rows[l], x+4, y);
-      ctx.beginPath();
-      ctx.moveTo(x, y+lineHeight-6);
-      ctx.lineTo(x+colWidth, y+lineHeight-6);
-      ctx.stroke();
-      y+=lineHeight;
+    for(let c=0;c<3;c++){
+      const x = 14 + c*colWidth;
+      const lines = (cols[c] || "").split("\n");
+      let yy = y;
+
+      for(const line of lines){
+        ctx.fillText(line, x, yy);
+        yy += 28;
+      }
     }
+
+    y += headerHeight;
   }
 
-  // Nummer unten
-  ctx.font="bold 22px Arial";
-  ctx.textAlign="center";
-  ctx.fillText(number, ctx.canvas.height/2, ctx.canvas.width-28);
+  // === FREITEXT + LINIEN ===
+  ctx.font="20px Arial";
+  const rows = text.split("\n");
+
+  const usable = ctx.canvas.width - y - paddingBottom;
+  const maxLines = Math.floor(usable / lineHeight);
+
+  for(let i=0;i<maxLines;i++){
+    if(rows[i]){
+      ctx.fillText(rows[i], 14, y);
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(8, y + lineHeight - 6);
+    ctx.lineTo(ctx.canvas.height - 8, y + lineHeight - 6);
+    ctx.stroke();
+
+    y += lineHeight;
+  }
+
+  // NUMMER UNTEN
+  if(number){
+    ctx.font="bold 22px Arial";
+    ctx.textAlign="center";
+    ctx.fillText(
+      number,
+      ctx.canvas.height / 2,
+      ctx.canvas.width - 28
+    );
+  }
 
   ctx.restore();
 }
@@ -211,12 +235,14 @@ async function makePDF(){
 
   const left = (210-192)/2;
   const top  = (297-7*38)/2;
-  let slot=0;
+
+  let slot = 0;
 
   for(let i=1;i<=LABELS;i++){
     if(!document.getElementById("p"+i).checked) continue;
-    const canvas=document.getElementById("c"+i);
-    const img=await pdf.embedPng(canvas.toDataURL("image/png"));
+
+    const canvas = document.getElementById("c"+i);
+    const img = await pdf.embedPng(canvas.toDataURL("image/png"));
 
     page.drawImage(img,{
       x:mm(left),
@@ -224,15 +250,20 @@ async function makePDF(){
       width:mm(192),
       height:mm(38)
     });
+
     slot++;
   }
 
-  const bytes=await pdf.save();
-  const blob=new Blob([bytes],{type:"application/pdf"});
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download="Ordneretiketten_38x192.pdf";
+  const bytes = await pdf.save();
+  const blob = new Blob([bytes],{type:"application/pdf"});
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "Ordneretiketten_38x192.pdf";
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
 }
 </script>
 
