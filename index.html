@@ -121,7 +121,7 @@ for(let i=1;i<=LABELS;i++){
         <canvas id="c${i}" width="1152" height="228"></canvas>
       </div>
 
-      <textarea id="h${i}" placeholder="Überschrift (--- = neue Spalte)" oninput="update(${i})"></textarea>
+      <textarea id="h${i}" placeholder="Überschrift (3 Spalten mit --- trennen)" oninput="update(${i})"></textarea>
       <textarea id="t${i}" placeholder="Freitext – Linien erscheinen im Druck" oninput="update(${i})"></textarea>
       <input id="n${i}" placeholder="Nummer unten (z. B. 01)" oninput="update(${i})">
     </div>
@@ -141,9 +141,7 @@ function resetAll(){
 }
 
 function update(i){
-  const canvas = document.getElementById("c"+i);
-  const ctx = canvas.getContext("2d");
-
+  const ctx = document.getElementById("c"+i).getContext("2d");
   drawLabel(
     ctx,
     document.getElementById("h"+i).value,
@@ -152,7 +150,7 @@ function update(i){
   );
 }
 
-// ZEICHNEN
+/* ================= ZEICHNEN ================= */
 function drawLabel(ctx, header, text, number){
   ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
   ctx.fillStyle="#fff";
@@ -162,23 +160,28 @@ function drawLabel(ctx, header, text, number){
   ctx.translate(0, ctx.canvas.height);
   ctx.rotate(-Math.PI/2);
 
+  const labelWidth  = ctx.canvas.height;
+  const labelHeight = ctx.canvas.width;
+
   const paddingTop = 10;
-  const headerHeight = 46;
+  const headerHeight = 52;
   const paddingBottom = 42;
   const lineHeight = 34;
 
   let y = paddingTop;
 
-  // === ÜBERSCHRIFT: 3 SPALTEN ===
+  /* ===== ÜBERSCHRIFT – 3 SPALTEN ===== */
   if(header){
     const cols = header.split(/\n---\n?/);
-    const colWidth = (ctx.canvas.height - 40) / 3;
+    const colWidth = (labelWidth - 40) / 3;
 
     ctx.font="bold 26px Arial";
+    ctx.fillStyle="#000";
     ctx.textBaseline="top";
+    ctx.textAlign="left";
 
     for(let c=0;c<3;c++){
-      const x = 14 + c*colWidth;
+      const x = 14 + c * colWidth;
       const lines = (cols[c] || "").split("\n");
       let yy = y;
 
@@ -191,34 +194,35 @@ function drawLabel(ctx, header, text, number){
     y += headerHeight;
   }
 
-  // === FREITEXT + LINIEN ===
+  /* ===== FREITEXT + LINIEN ===== */
   ctx.font="20px Arial";
   const rows = text.split("\n");
 
-  const usable = ctx.canvas.width - y - paddingBottom;
+  const usable = labelHeight - y - paddingBottom;
   const maxLines = Math.floor(usable / lineHeight);
 
   for(let i=0;i<maxLines;i++){
+    emphasize = false;
     if(rows[i]){
       ctx.fillText(rows[i], 14, y);
     }
 
     ctx.beginPath();
     ctx.moveTo(8, y + lineHeight - 6);
-    ctx.lineTo(ctx.canvas.height - 8, y + lineHeight - 6);
+    ctx.lineTo(labelWidth - 8, y + lineHeight - 6);
     ctx.stroke();
 
     y += lineHeight;
   }
 
-  // NUMMER UNTEN
+  /* ===== NUMMER UNTEN ===== */
   if(number){
     ctx.font="bold 22px Arial";
     ctx.textAlign="center";
     ctx.fillText(
       number,
-      ctx.canvas.height / 2,
-      ctx.canvas.width - 28
+      labelWidth / 2,
+      labelHeight - 28
     );
   }
 
