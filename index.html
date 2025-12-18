@@ -218,25 +218,28 @@ function drawLabel(ctx, header, text, number){
 const mm = v => v * 2.83465;
 
 // PDF – Feste Positionen
+<script>
 async function makePDF(){
   const pdf = await PDFLib.PDFDocument.create();
-  const page = pdf.addPage([595,842]);
+  const page = pdf.addPage([595,842]); // A4
 
   const left = (210-192)/2;
   const top  = (297-7*38)/2;
 
   for(let i=1;i<=LABELS;i++){
-    if(!p(i).checked) continue;
+    if(!document.getElementById("p"+i).checked) continue;
 
-    const img = await pdf.embedPng(
-      document.getElementById("c"+i).toDataURL("image/png")
-    );
+    const canvas = document.getElementById("c"+i);
+    const img = await pdf.embedPng(canvas.toDataURL("image/png"));
+
+    // 👉 SLOT = ORDNER-NUMMER - 1
+    const slot = i - 1;
 
     page.drawImage(img,{
-      x:mm(left),
-      y:842-mm(top+i*38),
-      width:mm(192),
-      height:mm(38)
+      x: mm(left),
+      y: 842 - mm(top + (slot + 1) * 38),
+      width: mm(192),
+      height: mm(38)
     });
   }
 
@@ -244,12 +247,15 @@ async function makePDF(){
   const blob = new Blob([bytes],{type:"application/pdf"});
   const url = URL.createObjectURL(blob);
 
-  const a=document.createElement("a");
-  a.href=url;
-  a.download="Ordneretiketten_38x192.pdf";
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "Ordneretiketten_38x192.pdf";
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
 }
 </script>
+
 
 </body>
 </html>
