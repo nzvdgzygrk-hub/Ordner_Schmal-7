@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Avery Ordneretiketten 38×192 mm</title>
+<title>Avery L4760 Ordneretiketten (seitlich)</title>
 
 <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
 
@@ -74,11 +74,11 @@ button {
 <script>
 const LABELS = 7;
 
-/* 🔧 DRUCKER-JUSTAGE (falls nötig) */
-const GLOBAL_SHIFT_X_MM = 0;   // rechts +, links -
-const GLOBAL_SHIFT_Y_MM = 0;   // runter +, hoch -
+/* Drucker-Feinjustage (meist 0 lassen) */
+const SHIFT_X_MM = 0;
+const SHIFT_Y_MM = 0;
 
-/* UI bauen */
+/* UI */
 for (let i = 1; i <= LABELS; i++) {
   col.insertAdjacentHTML("beforeend", `
     <div class="label">
@@ -89,45 +89,46 @@ ORDNER ${i}
   `);
 }
 
-/* Reset */
 function resetAll() {
   for (let i = 1; i <= LABELS; i++) {
     document.getElementById("t"+i).innerText = "";
   }
 }
 
-/* PDF */
+/* PDF mit 90° gedrehtem Text */
 async function makePDF() {
   const pdf = await PDFLib.PDFDocument.create();
   const page = pdf.addPage([595, 842]); // A4
   const font = await pdf.embedFont(PDFLib.StandardFonts.Helvetica);
 
   const mm = v => v * 2.83465;
+
   const LABEL_W = 38;
   const LABEL_H = 192;
 
-  const startX = (210 - LABEL_W) / 2 + GLOBAL_SHIFT_X_MM;
+  const startX = (210 - LABEL_W) / 2 + SHIFT_X_MM;
 
   for (let i = 1; i <= LABELS; i++) {
     const text = document.getElementById("t"+i).innerText.trim();
     if (!text) continue;
 
     const x0 = mm(startX);
-    const y0 = 842 - mm((i * LABEL_H) + GLOBAL_SHIFT_Y_MM);
+    const y0 = 842 - mm(i * LABEL_H + SHIFT_Y_MM);
 
-    let ty = y0 + mm(LABEL_H - 12);
-    const lines = text.split("\n");
+    /* Drehpunkt: links unten im Etikett */
+    let ty = y0 + mm(10);
+    const tx = x0 + mm(LABEL_W - 6);
 
-    for (let line of lines) {
-      if (ty < y0 + mm(6)) break;
+    text.split("\n").forEach(line => {
       page.drawText(line, {
-        x: x0 + mm(4),
+        x: tx,
         y: ty,
         size: 14,
-        font
+        font,
+        rotate: PDFLib.degrees(90)
       });
-      ty -= 16;
-    }
+      ty += 18;
+    });
   }
 
   const bytes = await pdf.save();
@@ -136,7 +137,7 @@ async function makePDF() {
 
   const a = document.createElement("a");
   a.href = url;
-  a.download = "ordneretiketten_38x192.pdf";
+  a.download = "avery_L4760_ordneretiketten_seitlich.pdf";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
