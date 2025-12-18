@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Avery L4760 – Ordneretiketten</title>
+<title>Avery L4760 Ordneretiketten</title>
 
 <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
 
@@ -40,7 +40,6 @@ button {
   grid-template-columns: 38mm 38mm;
   grid-template-rows: repeat(4, 192mm);
   justify-content: center;
-  align-content: start;
 }
 
 .label {
@@ -68,13 +67,12 @@ button {
 
 <script>
 /*
-Layout wie Avery-Bogen:
+Avery L4760 Layout:
 [0][1]
 [2][3]
 [4][5]
 [6][ ]
 */
-
 const POS = [
   {c:0,r:0},{c:1,r:0},
   {c:0,r:1},{c:1,r:1},
@@ -85,11 +83,11 @@ const POS = [
 const LABEL_W = 38;
 const LABEL_H = 192;
 
-/* Drucker-Feintuning */
+/* Feintuning falls Drucker minimal abweicht */
 const SHIFT_X_MM = 0;
 const SHIFT_Y_MM = 0;
 
-/* UI */
+/* UI bauen */
 POS.forEach((_, i) => {
   sheet.insertAdjacentHTML("beforeend", `
     <div class="label">
@@ -123,19 +121,17 @@ async function makePDF() {
     const x0 = mm(startX + p.c * LABEL_W);
     const y0 = 842 - mm((p.r + 1) * LABEL_H + SHIFT_Y_MM);
 
-    /* Text wird IM PDF gedreht */
-    let tx = x0 + mm(LABEL_W - 6);
-    let ty = y0 + mm(12);
+    /* 🔥 WICHTIG: Textblock EINMAL drehen */
+    const lines = text.split("\n");
+    const block = lines.join("\n");
 
-    text.split("\n").forEach(line => {
-      page.drawText(line, {
-        x: tx,
-        y: ty,
-        size: 14,
-        font,
-        rotate: PDFLib.degrees(90)
-      });
-      ty += 18;
+    page.drawText(block, {
+      x: x0 + mm(LABEL_W - 6),
+      y: y0 + mm(10),
+      size: 14,
+      font,
+      rotate: PDFLib.degrees(90),
+      lineHeight: 16
     });
   });
 
@@ -145,7 +141,7 @@ async function makePDF() {
 
   const a = document.createElement("a");
   a.href = url;
-  a.download = "avery_L4760_ordneretiketten.pdf";
+  a.download = "avery_L4760_ordneretiketten_final.pdf";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
