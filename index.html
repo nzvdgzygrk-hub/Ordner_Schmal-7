@@ -2,8 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Ordneretiketten 38 × 192 mm</title>
-
+<title>Ordneretiketten 38×192</title>
 <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
 
 <style>
@@ -12,14 +11,12 @@ body{
   background:#f2f2f2;
   margin:16px;
 }
-
 .topbar{
   max-width:1200px;
   margin:0 auto 12px;
   display:flex;
   gap:10px;
 }
-
 button{
   padding:10px 14px;
   font-size:15px;
@@ -38,7 +35,6 @@ button{
   padding:14px;
   border-radius:10px;
 }
-
 .grid{
   display:grid;
   grid-template-columns:repeat(2,1fr);
@@ -47,13 +43,11 @@ button{
 @media(max-width:900px){
   .grid{grid-template-columns:1fr}
 }
-
 .card{
   border:1px solid #ddd;
   border-radius:10px;
   padding:10px;
 }
-
 .cardHeader{
   display:flex;
   justify-content:space-between;
@@ -67,60 +61,21 @@ button{
   height:38mm;
   border:1px dashed #999;
   margin-bottom:6px;
-  position:relative;
-  overflow:hidden;
+  background:#fff;
 }
 
-/* gedrehter Inhalt */
-.previewInner{
-  position:absolute;
-  width:38mm;
-  height:192mm;
-  top:50%;
-  left:50%;
-  transform:translate(-50%,-50%) rotate(-90deg);
+input,textarea{
+  width:100%;
   box-sizing:border-box;
-  padding:6mm;
-  display:flex;
-  flex-direction:column;
-  justify-content:space-between;
-}
-
-/* Linien */
-.line{
-  height:1px;
-  background:#000;
-}
-
-/* Texte */
-.title{
+  padding:6px;
+  border-radius:6px;
+  border:1px solid #ccc;
   font-size:14px;
-  font-weight:bold;
-  margin-top:4mm;
-}
-
-.content{
-  flex:1;
-  font-size:13px;
-  white-space:pre-wrap;
-}
-
-.number{
-  font-size:16px;
-  font-weight:bold;
-  text-align:center;
-  margin-top:2mm;
 }
 
 textarea{
-  width:100%;
   min-height:120px;
   resize:vertical;
-  font-size:14px;
-  padding:8px;
-  border-radius:8px;
-  border:1px solid #ccc;
-  box-sizing:border-box;
 }
 </style>
 </head>
@@ -140,118 +95,111 @@ textarea{
 const LABELS = 7;
 const grid = document.getElementById("grid");
 
-function defaultText(i){
-  return {
-    title: "Inhaltsverzeichnis",
-    content: "",
-    number: String(i).padStart(2,"0")
-  };
-}
-
-// UI bauen
+// UI
 for(let i=1;i<=LABELS;i++){
   grid.insertAdjacentHTML("beforeend",`
     <div class="card">
       <div class="cardHeader">
         <strong>ORDNER ${i}</strong>
-        <label>
-          Drucken
-          <input type="checkbox" id="p${i}" checked>
-        </label>
+        <label>Drucken <input type="checkbox" id="p${i}" checked></label>
       </div>
 
-      <div class="preview">
-        <div class="previewInner">
-          <div class="line"></div>
-          <div class="title" id="vt${i}"></div>
-          <div class="content" id="vc${i}"></div>
-          <div class="line"></div>
-          <div class="number" id="vn${i}"></div>
-        </div>
-      </div>
+      <div class="preview"></div>
 
-      <textarea id="t${i}" placeholder="Haupttext (freies Feld)" oninput="update(${i})"></textarea>
+      <input id="h${i}" placeholder="Überschrift (z.B. Haus 2021)">
+
+      <textarea id="t${i}" placeholder="Freitext – Linien erscheinen erst im Druck"></textarea>
     </div>
   `);
-
-  const d = defaultText(i);
-  document.getElementById("t"+i).value = d.content;
-  document.getElementById("vt"+i).innerText = d.title;
-  document.getElementById("vn"+i).innerText = d.number;
-}
-
-// Vorschau aktualisieren
-function update(i){
-  document.getElementById("vc"+i).innerText =
-    document.getElementById("t"+i).value;
 }
 
 // Reset
 function resetAll(){
   for(let i=1;i<=LABELS;i++){
-    document.getElementById("t"+i).value = "";
-    document.getElementById("p"+i).checked = false;
-    update(i);
+    document.getElementById("h"+i).value="";
+    document.getElementById("t"+i).value="";
+    document.getElementById("p"+i).checked=false;
   }
 }
 
 // mm → pt
 const mm = v => v * 2.83465;
 
-// PDF erzeugen
+// PDF
 async function makePDF(){
   const pdf = await PDFLib.PDFDocument.create();
   const page = pdf.addPage([595,842]); // A4
 
   const left = (210-192)/2;
   const top  = (297-7*38)/2;
-
   let slot = 0;
 
   for(let i=1;i<=LABELS;i++){
     if(!document.getElementById("p"+i).checked) continue;
 
+    const header = document.getElementById("h"+i).value;
+    const text   = document.getElementById("t"+i).value.split("\n");
+
     const canvas = document.createElement("canvas");
-    canvas.width = 38*6;
-    canvas.height = 192*6;
+    canvas.width = 192*6;
+    canvas.height = 38*6;
     const ctx = canvas.getContext("2d");
 
     ctx.fillStyle="#fff";
     ctx.fillRect(0,0,canvas.width,canvas.height);
 
-    ctx.strokeStyle="#000";
-    ctx.lineWidth=2;
+    ctx.translate(canvas.width/2,canvas.height/2);
+    ctx.rotate(-Math.PI/2);
 
-    // obere Linie
-    ctx.beginPath();
-    ctx.moveTo(10,20);
-    ctx.lineTo(canvas.width-10,20);
-    ctx.stroke();
-
-    // untere Linie
-    ctx.beginPath();
-    ctx.moveTo(10,canvas.height-40);
-    ctx.lineTo(canvas.width-10,canvas.height-40);
-    ctx.stroke();
-
+    // Überschrift
+    ctx.font="bold 30px Arial";
+    ctx.textAlign="left";
+    ctx.textBaseline="top";
     ctx.fillStyle="#000";
-    ctx.font="bold 26px Arial";
-    ctx.fillText("Inhaltsverzeichnis",20,60);
+    ctx.fillText(header,-90,-105);
 
-    ctx.font="20px Arial";
-    const lines = document.getElementById("t"+i).value.split("\n");
-    let y=100;
-    for(const l of lines){
-      ctx.fillText(l,20,y);
-      y+=28;
+    // Linie unter Überschrift
+    ctx.beginPath();
+    ctx.moveTo(-90,-70);
+    ctx.lineTo(90,-70);
+    ctx.stroke();
+
+    // Linien im Mittelteil (nur Druck!)
+    const lineStart = -55;
+    const lineEnd   = 95;
+    const lineGap   = 22;
+
+    let y = lineStart;
+    while(y < lineEnd){
+      ctx.beginPath();
+      ctx.moveTo(-90,y);
+      ctx.lineTo(90,y);
+      ctx.stroke();
+      y += lineGap;
     }
 
+    // Text auf Linien
+    ctx.font="18px Arial";
+    y = lineStart - 2;
+    for(const l of text){
+      ctx.fillText(l,-85,y);
+      y += lineGap;
+    }
+
+    // Untere Linie
+    ctx.beginPath();
+    ctx.moveTo(-90,110);
+    ctx.lineTo(90,110);
+    ctx.stroke();
+
+    // Nummer
     ctx.font="bold 28px Arial";
     ctx.textAlign="center";
-    ctx.fillText(String(i).padStart(2,"0"),canvas.width/2,canvas.height-10);
+    ctx.fillText(String(i).padStart(2,"0"),0,115);
+
+    ctx.resetTransform();
 
     const img = await pdf.embedPng(canvas.toDataURL("image/png"));
-
     page.drawImage(img,{
       x:mm(left),
       y:842-mm(top+(slot+1)*38),
@@ -265,10 +213,13 @@ async function makePDF(){
   const bytes = await pdf.save();
   const blob = new Blob([bytes],{type:"application/pdf"});
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
+
+  const a=document.createElement("a");
   a.href=url;
   a.download="Ordneretiketten_38x192.pdf";
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
 }
 </script>
 
