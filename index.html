@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Avery Ordneretiketten 38×192 mm</title>
+
+<script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #f2f2f2;
+  margin: 15px;
+}
+
+.topbar {
+  max-width: 210mm;
+  margin: 0 auto 10px;
+  display: flex;
+  justify-content: space-between;
+}
+
+button {
+  padding: 10px 14px;
+  font-size: 15px;
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+}
+.reset { background: #c9302c; }
+.pdf { background: #0275d8; }
+
+.sheet {
+  width: 210mm;
+  height: 297mm;
+  background: #fff;
+  display: flex;
+  justify-content: center;
+}
+
+.column {
+  width: 38mm;
+  display: grid;
+  grid-template-rows: repeat(7, 192mm);
+}
+
+.label {
+  border: 1px dashed #aaa;
+  box-sizing: border-box;
+  padding: 6mm 4mm;
+}
+
+.text {
+  font-size: 14px;
+  white-space: pre-line;
+  height: 100%;
+}
+</style>
+</head>
+
+<body>
+
+<div class="topbar">
+  <button class="reset" onclick="resetAll()">Reset</button>
+  <button class="pdf" onclick="makePDF()">PDF erstellen</button>
+</div>
+
+<div class="sheet">
+  <div class="column" id="col"></div>
+</div>
+
+<script>
+const LABELS = 7;
+
+/* 🔧 DRUCKER-JUSTAGE (falls nötig) */
+const GLOBAL_SHIFT_X_MM = 0;   // rechts +, links -
+const GLOBAL_SHIFT_Y_MM = 0;   // runter +, hoch -
+
+/* UI bauen */
+for (let i = 1; i <= LABELS; i++) {
+  col.insertAdjacentHTML("beforeend", `
+    <div class="label">
+      <div class="text" id="t${i}" contenteditable>
+ORDNER ${i}
+      </div>
+    </div>
+  `);
+}
+
+/* Reset */
+function resetAll() {
+  for (let i = 1; i <= LABELS; i++) {
+    document.getElementById("t"+i).innerText = "";
+  }
+}
+
+/* PDF */
+async function makePDF() {
+  const pdf = await PDFLib.PDFDocument.create();
+  const page = pdf.addPage([595, 842]); // A4
+  const font = await pdf.embedFont(PDFLib.StandardFonts.Helvetica);
+
+  const mm = v => v * 2.83465;
+  const LABEL_W = 38;
+  const LABEL_H = 192;
+
+  const startX = (210 - LABEL_W) / 2 + GLOBAL_SHIFT_X_MM;
+
+  for (let i = 1; i <= LABELS; i++) {
+    const text = document.getElementById("t"+i).innerText.trim();
+    if (!text) continue;
+
+    const x0 = mm(startX);
+    const y0 = 842 - mm((i * LABEL_H) + GLOBAL_SHIFT_Y_MM);
+
+    let ty = y0 + mm(LABEL_H - 12);
+    const lines = text.split("\n");
+
+    for (let line of lines) {
+      if (ty < y0 + mm(6)) break;
+      page.drawText(line, {
+        x: x0 + mm(4),
+        y: ty,
+        size: 14,
+        font
+      });
+      ty -= 16;
+    }
+  }
+
+  const bytes = await pdf.save();
+  const blob = new Blob([bytes], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "ordneretiketten_38x192.pdf";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+</script>
+
+</body>
+</html>
