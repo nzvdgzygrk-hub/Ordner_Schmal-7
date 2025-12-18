@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Avery L4760 Ordneretiketten</title>
+<title>Avery L4760 Ordneretiketten – stabil</title>
 
 <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
 
@@ -44,14 +44,13 @@ button {
 
 .label {
   border: 1px dashed #aaa;
-  box-sizing: border-box;
   padding: 6mm 4mm;
+  box-sizing: border-box;
 }
 
 .text {
   font-size: 14px;
   white-space: pre-line;
-  height: 100%;
 }
 </style>
 </head>
@@ -67,7 +66,7 @@ button {
 
 <script>
 /*
-Avery L4760 Layout:
+Layout wie echter Avery-Bogen:
 [0][1]
 [2][3]
 [4][5]
@@ -83,11 +82,7 @@ const POS = [
 const LABEL_W = 38;
 const LABEL_H = 192;
 
-/* Feintuning falls Drucker minimal abweicht */
-const SHIFT_X_MM = 0;
-const SHIFT_Y_MM = 0;
-
-/* UI bauen */
+/* UI */
 POS.forEach((_, i) => {
   sheet.insertAdjacentHTML("beforeend", `
     <div class="label">
@@ -104,34 +99,34 @@ function resetAll() {
   });
 }
 
-/* PDF */
+/* PDF – LANDSCAPE */
 async function makePDF() {
   const pdf = await PDFLib.PDFDocument.create();
-  const page = pdf.addPage([595, 842]); // A4
+
+  // 🔥 A4 QUERFORMAT
+  const page = pdf.addPage([842, 595]);
   const font = await pdf.embedFont(PDFLib.StandardFonts.Helvetica);
   const mm = v => v * 2.83465;
 
-  const totalW = LABEL_W * 2;
-  const startX = (210 - totalW) / 2 + SHIFT_X_MM;
+  const startX = 40; // linker Rand im Querformat
+  const startY = 595 - 20;
 
   POS.forEach((p, i) => {
     const text = document.getElementById("t"+i).innerText.trim();
     if (!text) return;
 
-    const x0 = mm(startX + p.c * LABEL_W);
-    const y0 = 842 - mm((p.r + 1) * LABEL_H + SHIFT_Y_MM);
+    const x = mm(startX + p.c * LABEL_H);
+    const y = startY - mm((p.r + 1) * LABEL_W);
 
-    /* 🔥 WICHTIG: Textblock EINMAL drehen */
-    const lines = text.split("\n");
-    const block = lines.join("\n");
-
-    page.drawText(block, {
-      x: x0 + mm(LABEL_W - 6),
-      y: y0 + mm(10),
-      size: 14,
-      font,
-      rotate: PDFLib.degrees(90),
-      lineHeight: 16
+    let ty = y;
+    text.split("\n").forEach(line => {
+      page.drawText(line, {
+        x: x,
+        y: ty,
+        size: 14,
+        font
+      });
+      ty -= 16;
     });
   });
 
@@ -141,7 +136,7 @@ async function makePDF() {
 
   const a = document.createElement("a");
   a.href = url;
-  a.download = "avery_L4760_ordneretiketten_final.pdf";
+  a.download = "avery_L4760_stabil.pdf";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
