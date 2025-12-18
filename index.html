@@ -2,100 +2,81 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Ordneretiketten 38×192 mm</title>
+<title>Ordneretiketten 38×192</title>
 <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
 
 <style>
-body{
-  font-family:Arial,sans-serif;
-  background:#f2f2f2;
-  margin:16px;
-}
-button{
-  padding:10px 14px;
-  border:0;
-  border-radius:6px;
-  color:#fff;
-  cursor:pointer;
-  font-size:15px;
-}
+body{font-family:Arial;background:#f2f2f2;margin:16px}
+.topbar{max-width:1200px;margin:auto;margin-bottom:12px;display:flex;gap:10px}
+button{padding:10px 16px;border:0;border-radius:6px;color:#fff;font-size:15px;cursor:pointer}
 .reset{background:#c9302c}
 .pdf{background:#0275d8}
 
-.wrapper{
-  max-width:1200px;
-  margin:auto;
-  background:#fff;
-  padding:14px;
-  border-radius:10px;
-}
-
-.grid{
-  display:grid;
-  grid-template-columns:repeat(2,1fr);
-  gap:16px;
-}
+.wrapper{max-width:1200px;margin:auto;background:#fff;padding:14px;border-radius:10px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
 @media(max-width:900px){.grid{grid-template-columns:1fr}}
 
-.card{
-  border:1px solid #ccc;
-  border-radius:10px;
-  padding:10px;
-}
+.card{border:1px solid #ddd;border-radius:10px;padding:10px}
+.cardHeader{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
 
-.header{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  margin-bottom:6px;
-}
-
-/* Vorschau – NICHT gedreht */
+/* VORSCHAU – echte Druckgröße */
 .preview{
   width:192mm;
   height:38mm;
   border:1px dashed #999;
   margin-bottom:6px;
-  padding:6px;
-  box-sizing:border-box;
+  position:relative;
+  overflow:hidden;
+}
+
+/* Inhalt (gedreht wie am Ordner) */
+.previewInner{
+  position:absolute;
+  inset:0;
+  transform:rotate(-90deg);
+  transform-origin:center;
   display:flex;
-  flex-direction:column;
-  justify-content:space-between;
+  width:38mm;
+  height:192mm;
 }
 
-/* Texte */
-.title{
-  font-size:16px;
-  font-weight:bold;
-}
-.body{
-  flex:1;
-  font-size:13px;
-  white-space:pre-wrap;
-}
-.footer{
-  font-size:14px;
-  font-weight:bold;
-  text-align:right;
+/* Spalten */
+.colLeft{width:28mm;padding:4mm 2mm;font-weight:bold;font-size:18px}
+.colMain{flex:1;position:relative;padding:6mm 4mm}
+.colNum{width:16mm;display:flex;align-items:flex-end;justify-content:center;font-weight:bold}
+
+/* Linien (NUR VORSCHAU-HILFE) */
+.lines{
+  position:absolute;
+  inset:0;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 16px,
+      rgba(0,0,0,.25) 17px
+    );
 }
 
+/* Eingaben */
 input,textarea{
   width:100%;
   box-sizing:border-box;
-  margin-top:4px;
+  font-size:14px;
   padding:6px;
   border-radius:6px;
   border:1px solid #ccc;
-  font-size:14px;
 }
-textarea{min-height:80px;resize:vertical}
+textarea{min-height:110px;resize:vertical}
 </style>
 </head>
 
 <body>
 
-<button class="reset" onclick="resetAll()">Reset</button>
-<button class="pdf" onclick="makePDF()">PDF erstellen</button>
+<div class="topbar">
+  <button class="reset" onclick="resetAll()">Reset</button>
+  <button class="pdf" onclick="makePDF()">PDF erstellen</button>
+</div>
 
 <div class="wrapper">
   <div class="grid" id="grid"></div>
@@ -108,109 +89,104 @@ const grid=document.getElementById("grid");
 for(let i=1;i<=LABELS;i++){
   grid.insertAdjacentHTML("beforeend",`
   <div class="card">
-    <div class="header">
+    <div class="cardHeader">
       <strong>ORDNER ${i}</strong>
       <label>Drucken <input type="checkbox" id="p${i}" checked></label>
     </div>
 
     <div class="preview">
-      <div class="title" id="pt${i}">Haus 2021</div>
-      <div class="body" id="pb${i}"></div>
-      <div class="footer" id="pf${i}">${String(i).padStart(2,"0")}</div>
+      <div class="previewInner">
+        <div class="colLeft" id="vh${i}"></div>
+        <div class="colMain">
+          <div class="lines"></div>
+          <div id="vm${i}" style="position:relative;white-space:pre;font-size:14px"></div>
+        </div>
+        <div class="colNum" id="vn${i}"></div>
+      </div>
     </div>
 
-    <input id="t${i}" placeholder="Überschrift (z.B. Haus 2021)" value="Haus 2021"
-      oninput="update(${i})">
-
-    <textarea id="b${i}" placeholder="Freitext – Linien erscheinen erst im Druck"
-      oninput="update(${i})"></textarea>
-
-    <input id="f${i}" placeholder="Nummer unten" value="${String(i).padStart(2,"0")}"
-      oninput="update(${i})">
+    <input id="h${i}" placeholder="Überschrift (z. B. Haus 2021)" oninput="upd(${i})">
+    <textarea id="m${i}" placeholder="Freitext – Linien erscheinen erst im Druck" oninput="upd(${i})"></textarea>
+    <input id="n${i}" placeholder="Nummer (z. B. 01)" oninput="upd(${i})">
   </div>`);
 }
 
-function update(i){
-  pt(i).innerText=t(i).value;
-  pb(i).innerText=b(i).value;
-  pf(i).innerText=f(i).value;
+function upd(i){
+  vh(i).textContent=h(i).value;
+  vm(i).textContent=m(i).value;
+  vn(i).textContent=n(i).value;
 }
-const t=i=>document.getElementById("t"+i);
-const b=i=>document.getElementById("b"+i);
-const f=i=>document.getElementById("f"+i);
-const pt=i=>document.getElementById("pt"+i);
-const pb=i=>document.getElementById("pb"+i);
-const pf=i=>document.getElementById("pf"+i);
+function h(i){return document.getElementById("h"+i)}
+function m(i){return document.getElementById("m"+i)}
+function n(i){return document.getElementById("n"+i)}
+function vh(i){return document.getElementById("vh"+i)}
+function vm(i){return document.getElementById("vm"+i)}
+function vn(i){return document.getElementById("vn"+i)}
 
 function resetAll(){
   for(let i=1;i<=LABELS;i++){
-    t(i).value="Haus 2021";
-    b(i).value="";
-    f(i).value=String(i).padStart(2,"0");
-    update(i);
+    h(i).value="";
+    m(i).value="";
+    n(i).value=String(i).padStart(2,"0");
+    upd(i);
   }
 }
+resetAll();
 
-// mm → pt
+/* mm → pt */
 const mm=v=>v*2.83465;
 
 async function makePDF(){
   const pdf=await PDFLib.PDFDocument.create();
   const page=pdf.addPage([595,842]);
 
-  const left=(210-192)/2;
-  const top=(297-7*38)/2;
+  const startY=(297-LABELS*38)/2;
   let slot=0;
 
   for(let i=1;i<=LABELS;i++){
     if(!document.getElementById("p"+i).checked)continue;
 
-    const canvas=document.createElement("canvas");
-    canvas.width=192*6;
-    canvas.height=38*6;
-    const c=canvas.getContext("2d");
-    c.fillStyle="#fff";
-    c.fillRect(0,0,canvas.width,canvas.height);
+    const c=document.createElement("canvas");
+    c.width=38*6;
+    c.height=192*6;
+    const x=c.getContext("2d");
 
-    c.save();
-    c.translate(canvas.width/2,canvas.height/2);
-    c.rotate(-Math.PI/2);
+    x.fillStyle="#fff";
+    x.fillRect(0,0,c.width,c.height);
 
-    // Überschrift
-    c.font="bold 26px Arial";
-    c.textAlign="left";
-    c.fillStyle="#000";
-    c.fillText(t(i).value,-80,-80);
-
-    // Linien
-    let y=-50;
-    for(let l=0;l<10;l++){
-      c.beginPath();
-      c.moveTo(-80,y);
-      c.lineTo(80,y);
-      c.stroke();
-      y+=14;
+    /* Linien bis über Zahl */
+    x.strokeStyle="#000";
+    for(let y=20;y<c.height-60;y+=28){
+      x.beginPath();
+      x.moveTo(70,y);
+      x.lineTo(c.width-20,y);
+      x.stroke();
     }
 
-    // Text
-    c.font="18px Arial";
-    y=-50;
-    b(i).value.split("\n").forEach(line=>{
-      c.fillText(line,-80,y-3);
-      y+=14;
+    /* Text */
+    x.save();
+    x.translate(c.width/2,c.height/2);
+    x.rotate(-Math.PI/2);
+    x.fillStyle="#000";
+
+    x.font="bold 28px Arial";
+    x.fillText(h(i).value||"", -90, -60);
+
+    x.font="24px Arial";
+    let ty=-20;
+    m(i).value.split("\n").forEach(l=>{
+      x.fillText(l,-90,ty);
+      ty+=28;
     });
 
-    // Nummer unten
-    c.font="bold 22px Arial";
-    c.textAlign="right";
-    c.fillText(f(i).value,80,65);
+    x.font="bold 26px Arial";
+    x.fillText(n(i).value||"",80,80);
+    x.restore();
 
-    c.restore();
-
-    const img=await pdf.embedPng(canvas.toDataURL());
+    const img=await pdf.embedPng(c.toDataURL());
     page.drawImage(img,{
-      x:mm(left),
-      y:842-mm(top+(slot+1)*38),
+      x:mm((210-192)/2),
+      y:842-mm(startY+(slot+1)*38),
       width:mm(192),
       height:mm(38)
     });
