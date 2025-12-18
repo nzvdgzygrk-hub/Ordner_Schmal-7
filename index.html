@@ -1,147 +1,248 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Avery L4760 Ordneretiketten – stabil</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Avery Zweckform L4760REV-20 – Ordneretiketten</title>
 
 <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
 
 <style>
-body {
-  font-family: Arial, sans-serif;
-  background: #f2f2f2;
-  margin: 15px;
-}
+  body { font-family: Arial, sans-serif; background:#f2f2f2; margin: 15px; }
+  .topbar { max-width: 980px; margin: 0 auto 10px; display:flex; gap:10px; justify-content:space-between; }
+  button { padding:10px 14px; font-size:15px; border:0; border-radius:6px; color:#fff; cursor:pointer; }
+  .reset { background:#c9302c; }
+  .pdf   { background:#0275d8; }
 
-.topbar {
-  max-width: 210mm;
-  margin: 0 auto 10px;
-  display: flex;
-  justify-content: space-between;
-}
+  /* UI: Felder nebeneinander (nur Anzeige/Editing) */
+  .uiWrap { max-width: 980px; margin: 0 auto; background:#fff; padding:12px; border-radius:10px; }
+  .grid {
+    display:grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap:12px;
+  }
+  @media (max-width: 700px) {
+    .grid { grid-template-columns: 1fr; }
+  }
 
-button {
-  padding: 10px 14px;
-  font-size: 15px;
-  border: none;
-  border-radius: 6px;
-  color: #fff;
-  cursor: pointer;
-}
-.reset { background: #c9302c; }
-.pdf { background: #0275d8; }
+  .card {
+    border:1px solid #ddd;
+    border-radius:10px;
+    padding:10px;
+    background:#fff;
+  }
+  .row {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom:8px;
+  }
+  .title { font-weight:700; }
+  .hint { color:#666; font-size:12px; }
 
-.sheet {
-  width: 210mm;
-  height: 297mm;
-  background: #fff;
-  display: grid;
-  grid-template-columns: 38mm 38mm;
-  grid-template-rows: repeat(4, 192mm);
-  justify-content: center;
-}
+  textarea {
+    width:100%;
+    min-height:120px;
+    resize:vertical;
+    font-size:14px;
+    padding:10px;
+    border-radius:8px;
+    border:1px solid #ccc;
+    box-sizing:border-box;
+    white-space:pre-wrap;
+  }
 
-.label {
-  border: 1px dashed #aaa;
-  padding: 6mm 4mm;
-  box-sizing: border-box;
-}
-
-.text {
-  font-size: 14px;
-  white-space: pre-line;
-}
+  .settings { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+  .settings label { font-size:12px; color:#333; display:flex; align-items:center; gap:6px; }
+  .settings input { width:70px; padding:6px; border-radius:8px; border:1px solid #ccc; }
 </style>
 </head>
 
 <body>
+  <div class="topbar">
+    <button class="reset" onclick="resetAll()">Reset</button>
+    <button class="pdf" onclick="makePDF()">PDF erstellen</button>
+  </div>
 
-<div class="topbar">
-  <button class="reset" onclick="resetAll()">Reset</button>
-  <button class="pdf" onclick="makePDF()">PDF erstellen</button>
-</div>
+  <div class="uiWrap">
+    <div class="hint">
+      UI ist nur zum Eingeben (nebeneinander). Im PDF werden die 7 Etiketten korrekt auf A4 gesetzt (untereinander).
+    </div>
 
-<div class="sheet" id="sheet"></div>
+    <div class="settings">
+      <label>Shift X (mm) <input id="sx" type="number" step="0.5" value="0"></label>
+      <label>Shift Y (mm) <input id="sy" type="number" step="0.5" value="0"></label>
+      <label>Schrift (px) <input id="fs" type="number" step="1" value="28"></label>
+    </div>
+
+    <div class="grid" id="grid"></div>
+  </div>
 
 <script>
-/*
-Layout wie echter Avery-Bogen:
-[0][1]
-[2][3]
-[4][5]
-[6][ ]
-*/
-const POS = [
-  {c:0,r:0},{c:1,r:0},
-  {c:0,r:1},{c:1,r:1},
-  {c:0,r:2},{c:1,r:2},
-  {c:0,r:3}
-];
+  // Avery Zweckform L4760REV-20 (schmal/kurz): 38 x 192 mm, 7 Etiketten pro A4
+  // Auf A4 passen sie als 7 Streifen: 192mm breit, 38mm hoch, untereinander.
+  const LABELS = 7;
 
-const LABEL_W = 38;
-const LABEL_H = 192;
-
-/* UI */
-POS.forEach((_, i) => {
-  sheet.insertAdjacentHTML("beforeend", `
-    <div class="label">
-      <div class="text" id="t${i}" contenteditable>
-ORDNER ${i + 1}
+  // UI Felder erzeugen
+  const grid = document.getElementById("grid");
+  for (let i = 1; i <= LABELS; i++) {
+    grid.insertAdjacentHTML("beforeend", `
+      <div class="card">
+        <div class="row">
+          <div class="title">ORDNER ${i}</div>
+          <label style="font-size:12px; color:#333;">
+            Drucken <input type="checkbox" id="p${i}" checked>
+          </label>
+        </div>
+        <textarea id="t${i}" placeholder="Text für ORDNER ${i}...">ORDNER ${i}</textarea>
       </div>
-    </div>
-  `);
-});
+    `);
+  }
 
-function resetAll() {
-  POS.forEach((_, i) => {
-    document.getElementById("t"+i).innerText = "";
-  });
-}
+  function resetAll() {
+    for (let i=1;i<=LABELS;i++){
+      document.getElementById("t"+i).value = "";
+      document.getElementById("p"+i).checked = false;
+    }
+  }
 
-/* PDF – LANDSCAPE */
-async function makePDF() {
-  const pdf = await PDFLib.PDFDocument.create();
+  // Helfer: mm->pt
+  const mm = (v) => v * 2.83465;
 
-  // 🔥 A4 QUERFORMAT
-  const page = pdf.addPage([842, 595]);
-  const font = await pdf.embedFont(PDFLib.StandardFonts.Helvetica);
-  const mm = v => v * 2.83465;
+  // Canvas-Bild mit ROTIERTEM Text (stabil, kein pdf-lib rotate Chaos)
+  function makeRotatedLabelPng(text, labelWmm, labelHmm, fontPx) {
+    // Auflösung: px pro mm (6 = ziemlich scharf, noch iPhone-safe)
+    const pxPerMm = 6;
+    const W = Math.round(labelWmm * pxPerMm);
+    const H = Math.round(labelHmm * pxPerMm);
 
-  const startX = 40; // linker Rand im Querformat
-  const startY = 595 - 20;
+    const canvas = document.createElement("canvas");
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext("2d");
 
-  POS.forEach((p, i) => {
-    const text = document.getElementById("t"+i).innerText.trim();
-    if (!text) return;
+    // Hintergrund weiß
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0,0,W,H);
 
-    const x = mm(startX + p.c * LABEL_H);
-    const y = startY - mm((p.r + 1) * LABEL_W);
+    // Text vorbereiten
+    const linesRaw = (text || "").toString().split("\n").map(s => s.trim()).filter(Boolean);
+    const lines = linesRaw.length ? linesRaw : [""];
 
-    let ty = y;
-    text.split("\n").forEach(line => {
-      page.drawText(line, {
-        x: x,
-        y: ty,
-        size: 14,
-        font
+    // Wir drehen den Textblock um -90° (damit er auf dem Ordner-Rücken „seitlich“ steht)
+    // Nach Rotation ist die "Textbreite" ~ H, und "Texthöhe" ~ W.
+    ctx.save();
+    ctx.translate(W/2, H/2);
+    ctx.rotate(-Math.PI/2);
+
+    // Schrift
+    ctx.fillStyle = "#000000";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = `bold ${fontPx}px Arial`;
+
+    // Layout im gedrehten Raum:
+    const maxTextWidth = H * 0.85; // nach Rotation begrenzt durch H
+    const lineHeight = fontPx * 1.2;
+
+    // Falls eine Zeile zu lang ist, grob umbrechen
+    function wrapLine(line) {
+      const words = line.split(/\s+/);
+      const out = [];
+      let cur = "";
+      for (const w of words) {
+        const test = cur ? (cur + " " + w) : w;
+        if (ctx.measureText(test).width > maxTextWidth && cur) {
+          out.push(cur);
+          cur = w;
+        } else {
+          cur = test;
+        }
+      }
+      if (cur) out.push(cur);
+      return out.length ? out : [""];
+    }
+
+    let finalLines = [];
+    for (const ln of lines) finalLines.push(...wrapLine(ln));
+
+    // Vertikal zentrieren im gedrehten Raum
+    const blockHeight = finalLines.length * lineHeight;
+    let y = -blockHeight/2 + lineHeight/2;
+
+    // X=0, Y=y im gedrehten Koordinatensystem
+    for (const ln of finalLines) {
+      ctx.fillText(ln, 0, y);
+      y += lineHeight;
+    }
+
+    ctx.restore();
+
+    // PNG
+    return canvas.toDataURL("image/png");
+  }
+
+  async function makePDF() {
+    const sx = parseFloat(document.getElementById("sx").value || "0");
+    const sy = parseFloat(document.getElementById("sy").value || "0");
+    const fontPx = parseInt(document.getElementById("fs").value || "28", 10);
+
+    const pdf = await PDFLib.PDFDocument.create();
+    const page = pdf.addPage([595, 842]); // A4 Portrait
+
+    // Etikett-Abmessungen (Avery L4760):
+    const labelW = 192; // mm (Breite auf dem Blatt)
+    const labelH = 38;  // mm (Höhe auf dem Blatt)
+
+    // A4: 210 x 297 mm
+    // Horizontal zentriert: (210-192)/2 = 9mm links/rechts
+    const left = (210 - labelW) / 2 + sx;
+
+    // Vertikal: 7*38 = 266mm, Rest 31mm => oben/unten je 15.5mm
+    const topMargin = (297 - (7 * labelH)) / 2 + sy;
+
+    for (let i=1; i<=LABELS; i++) {
+      if (!document.getElementById("p"+i).checked) continue;
+
+      const text = document.getElementById("t"+i).value;
+
+      // Label-Position (mm)
+      const xMm = left;
+      const yMmTop = topMargin + (i-1) * labelH;
+
+      // In PDF-Koordinaten (pt): pdf-lib hat Ursprung unten links,
+      // wir rechnen von oben: y = pageHeight - (yTop + labelH)
+      const x = mm(xMm);
+      const y = 842 - mm(yMmTop + labelH);
+
+      // Bild mit gedrehtem Text erstellen
+      const dataUrl = makeRotatedLabelPng(text, labelW, labelH, fontPx);
+      const pngBytes = await fetch(dataUrl).then(r => r.arrayBuffer());
+      const png = await pdf.embedPng(pngBytes);
+
+      // Bild exakt in Label-Fläche setzen
+      page.drawImage(png, {
+        x, y,
+        width: mm(labelW),
+        height: mm(labelH),
       });
-      ty -= 16;
-    });
-  });
 
-  const bytes = await pdf.save();
-  const blob = new Blob([bytes], { type: "application/pdf" });
-  const url = URL.createObjectURL(blob);
+      // OPTIONAL: Debug-Rahmen (wenn du willst: aktivieren)
+      // page.drawRectangle({ x, y, width: mm(labelW), height: mm(labelH), borderWidth: 0.5, borderColor: PDFLib.rgb(0.7,0.7,0.7) });
+    }
 
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "avery_L4760_stabil.pdf";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-}
+    const bytes = await pdf.save();
+    const blob = new Blob([bytes], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "Avery_L4760REV-20_Ordneretiketten.pdf";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
 </script>
-
 </body>
 </html>
