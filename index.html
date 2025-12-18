@@ -163,39 +163,56 @@ function drawLabel(ctx, header, text, number){
   ctx.rotate(-Math.PI/2);
 
   const paddingTop = 10;
-  const headerHeight = 34;
+  const headerHeight = 36;
   const paddingBottom = 42;
-  const lineHeight = 34;
+  const lineHeight = 36;
 
-  let y = paddingTop;
+  let yStart = paddingTop;
 
   // ÜBERSCHRIFT (groß, ohne Linien)
   if(header){
     ctx.font="bold 28px Arial";
     ctx.fillStyle="#000";
     ctx.textBaseline="top";
-    ctx.fillText(header, 14, y);
-    y += headerHeight;
+    ctx.fillText(header, 14, yStart);
+    yStart += headerHeight;
   }
 
-  // FREITEXT + LINIEN
+  // 3 SPALTEN
+  const colCount = 3;
+  const colGap = 12;
+  const usableWidth = ctx.canvas.height - 16;
+  const colWidth = (usableWidth - colGap * (colCount - 1)) / colCount;
+
+  const usableHeight = ctx.canvas.width - yStart - paddingBottom;
+  const linesPerCol = Math.floor(usableHeight / lineHeight);
+
   ctx.font="20px Arial";
+  ctx.textAlign="left";
+  ctx.textBaseline="top";
+
   const rows = text.split("\n");
 
-  const usable = ctx.canvas.width - y - paddingBottom;
-  const maxLines = Math.floor(usable / lineHeight);
+  let rowIndex = 0;
 
-  for(let i=0;i<maxLines;i++){
-    if(rows[i]){
-      ctx.fillText(rows[i], 14, y);
+  for(let col=0; col<colCount; col++){
+    const x = 8 + col * (colWidth + colGap);
+    let y = yStart;
+
+    for(let l=0; l<linesPerCol; l++){
+      if(rows[rowIndex]){
+        ctx.fillText(rows[rowIndex], x + 6, y);
+        rowIndex++;
+      }
+
+      // Linie
+      ctx.beginPath();
+      ctx.moveTo(x, y + lineHeight - 6);
+      ctx.lineTo(x + colWidth, y + lineHeight - 6);
+      ctx.stroke();
+
+      y += lineHeight;
     }
-
-    ctx.beginPath();
-    ctx.moveTo(8, y + lineHeight - 6);
-    ctx.lineTo(ctx.canvas.height - 8, y + lineHeight - 6);
-    ctx.stroke();
-
-    y += lineHeight;
   }
 
   // NUMMER UNTEN (editierbar)
@@ -211,6 +228,7 @@ function drawLabel(ctx, header, text, number){
 
   ctx.restore();
 }
+
 
 // mm → pt
 const mm = v => v * 2.83465;
