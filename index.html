@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Avery L4760 Ordneretiketten (seitlich)</title>
+<title>Avery L4760 – Ordneretiketten</title>
 
 <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
 
@@ -36,14 +36,11 @@ button {
   width: 210mm;
   height: 297mm;
   background: #fff;
-  display: flex;
-  justify-content: center;
-}
-
-.column {
-  width: 38mm;
   display: grid;
-  grid-template-rows: repeat(7, 192mm);
+  grid-template-columns: 38mm 38mm;
+  grid-template-rows: repeat(4, 192mm);
+  justify-content: center;
+  align-content: start;
 }
 
 .label {
@@ -67,57 +64,68 @@ button {
   <button class="pdf" onclick="makePDF()">PDF erstellen</button>
 </div>
 
-<div class="sheet">
-  <div class="column" id="col"></div>
-</div>
+<div class="sheet" id="sheet"></div>
 
 <script>
-const LABELS = 7;
+/*
+Layout wie Avery-Bogen:
+[0][1]
+[2][3]
+[4][5]
+[6][ ]
+*/
 
-/* Drucker-Feinjustage (meist 0 lassen) */
+const POS = [
+  {c:0,r:0},{c:1,r:0},
+  {c:0,r:1},{c:1,r:1},
+  {c:0,r:2},{c:1,r:2},
+  {c:0,r:3}
+];
+
+const LABEL_W = 38;
+const LABEL_H = 192;
+
+/* Drucker-Feintuning */
 const SHIFT_X_MM = 0;
 const SHIFT_Y_MM = 0;
 
 /* UI */
-for (let i = 1; i <= LABELS; i++) {
-  col.insertAdjacentHTML("beforeend", `
+POS.forEach((_, i) => {
+  sheet.insertAdjacentHTML("beforeend", `
     <div class="label">
       <div class="text" id="t${i}" contenteditable>
-ORDNER ${i}
+ORDNER ${i + 1}
       </div>
     </div>
   `);
-}
+});
 
 function resetAll() {
-  for (let i = 1; i <= LABELS; i++) {
+  POS.forEach((_, i) => {
     document.getElementById("t"+i).innerText = "";
-  }
+  });
 }
 
-/* PDF mit 90° gedrehtem Text */
+/* PDF */
 async function makePDF() {
   const pdf = await PDFLib.PDFDocument.create();
   const page = pdf.addPage([595, 842]); // A4
   const font = await pdf.embedFont(PDFLib.StandardFonts.Helvetica);
-
   const mm = v => v * 2.83465;
 
-  const LABEL_W = 38;
-  const LABEL_H = 192;
+  const totalW = LABEL_W * 2;
+  const startX = (210 - totalW) / 2 + SHIFT_X_MM;
 
-  const startX = (210 - LABEL_W) / 2 + SHIFT_X_MM;
-
-  for (let i = 1; i <= LABELS; i++) {
+  POS.forEach((p, i) => {
     const text = document.getElementById("t"+i).innerText.trim();
-    if (!text) continue;
+    if (!text) return;
 
-    const x0 = mm(startX);
-    const y0 = 842 - mm(i * LABEL_H + SHIFT_Y_MM);
+    const x0 = mm(startX + p.c * LABEL_W);
+    const y0 = 842 - mm((p.r + 1) * LABEL_H + SHIFT_Y_MM);
 
-    /* Drehpunkt: links unten im Etikett */
-    let ty = y0 + mm(10);
-    const tx = x0 + mm(LABEL_W - 6);
+    /* Text wird IM PDF gedreht */
+    let tx = x0 + mm(LABEL_W - 6);
+    let ty = y0 + mm(12);
 
     text.split("\n").forEach(line => {
       page.drawText(line, {
@@ -129,7 +137,7 @@ async function makePDF() {
       });
       ty += 18;
     });
-  }
+  });
 
   const bytes = await pdf.save();
   const blob = new Blob([bytes], { type: "application/pdf" });
@@ -137,7 +145,7 @@ async function makePDF() {
 
   const a = document.createElement("a");
   a.href = url;
-  a.download = "avery_L4760_ordneretiketten_seitlich.pdf";
+  a.download = "avery_L4760_ordneretiketten.pdf";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
