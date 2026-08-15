@@ -1,0 +1,57 @@
+name: Build Ordner Schmal IPA
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'ios-native/**'
+      - 'project.yml'
+      - 'index.html'
+      - '.github/workflows/build-ios-ipa.yml'
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate AppIcon
+        run: |
+          python3 -m venv .icon-venv
+          . .icon-venv/bin/activate
+          python -m pip install --quiet pillow
+          mkdir -p ios-native/OrdnerSchmal/Assets.xcassets/AppIcon.appiconset
+          python <<'PY'
+          from PIL import Image, ImageDraw
+          from pathlib import Path
+          import json
+          out=Path('ios-native/OrdnerSchmal/Assets.xcassets/AppIcon.appiconset'); out.mkdir(parents=True,exist_ok=True)
+          img=Image.new('RGB',(1024,1024),'#7c3aed'); d=ImageDraw.Draw(img)
+          d.rounded_rectangle((345,120,679,904),radius=60,fill='white'); d.rectangle((410,230,614,300),fill='#7c3aed'); d.rectangle((410,380,614,450),fill='#7c3aed')
+          specs=[('20x20','2x',40),('20x20','3x',60),('29x29','2x',58),('29x29','3x',87),('40x40','2x',80),('40x40','3x',120),('60x60','2x',120),('60x60','3x',180)]
+          images=[]
+          for logical,scale,px in specs:
+            fn=f'AppIcon-{logical.replace("x","-")}-{scale}.png'; img.resize((px,px),Image.Resampling.LANCZOS).save(out/fn); images.append({'idiom':'iphone','size':logical,'scale':scale,'filename':fn})
+          img.save(out/'AppIcon-1024.png'); images.append({'idiom':'ios-marketing','size':'1024x1024','scale':'1x','filename':'AppIcon-1024.png'})
+          (out/'Contents.json').write_text(json.dumps({'images':images,'info':{'author':'xcode','version':1}},indent=2))
+          PY
+      - name: Generate Xcode project
+        run: xcodegen generate
+      - name: Build unsigned iPhone app
+        run: xcodebuild -project OrdnerSchmal.xcodeproj -scheme OrdnerSchmal -configuration Release -sdk iphoneos -derivedDataPath "$PWD/build" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+      - name: Verify resources
+        run: |
+          APP="$PWD/build/Build/Products/Release-iphoneos/Ordner Schmal.app"
+          test -f "$APP/index.html" && test -f "$APP/Assets.car"
+      - name: Package IPA
+        run: |
+          APP="$PWD/build/Build/Products/Release-iphoneos/Ordner Schmal.app"
+          rm -rf ipa && mkdir -p ipa/Payload
+          cp -R "$APP" ipa/Payload/
+          cd ipa && /usr/bin/zip -qry ../Ordner-Schmal-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Ordner-Schmal-iPhone-IPA
+          path: Ordner-Schmal-unsigned.ipa
+          retention-days: 14
