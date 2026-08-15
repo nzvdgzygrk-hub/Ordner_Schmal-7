@@ -12,9 +12,10 @@ targets:
       - path: ios-native/OrdnerSchmal
         excludes:
           - Assets.xcassets
-    resources:
       - path: index.html
+        buildPhase: resources
       - path: ios-native/OrdnerSchmal/Assets.xcassets
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: de.fatih.ordnerschmal
