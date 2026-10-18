@@ -90,6 +90,26 @@ textarea{
   resize:vertical;
   white-space:pre;
 }
+
+/* Mobile Bedienung und Schriftgroessen pro Zeile */
+.preview{max-width:100%;overflow-x:auto;box-sizing:border-box}
+.preview canvas{display:block;max-width:none}
+.editSettings{
+  display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;
+  padding:10px;background:#f6f6f6;border-radius:8px
+}
+.editSettings label{display:flex;align-items:center;gap:7px;font-size:13px}
+.editSettings input[type=range]{width:105px;margin:0}
+.editSettings output{min-width:34px;font-variant-numeric:tabular-nums}
+details{margin-top:10px;border:1px solid #ddd;border-radius:8px;padding:9px}
+summary{cursor:pointer;font-weight:600;font-size:14px}
+.helper{font-size:12px;color:#555;margin:8px 0 0}
+.lineRow{display:flex;align-items:center;gap:6px;margin-top:7px}
+.lineIndex{width:24px;flex-shrink:0;text-align:right;font-size:12px;color:#555}
+.lineRow input{flex:1;min-width:0;margin:0}
+.lineRow select{width:87px;flex-shrink:0;padding:6px 2px;font-size:13px;border:1px solid #ccc;border-radius:6px}
+.warning{color:#ac2217;font-size:12px;margin-top:8px;font-weight:600}
+
 </style>
 </head>
 
@@ -105,157 +125,284 @@ textarea{
 </div>
 
 <script>
+
 const LABELS = 7;
 const grid = document.getElementById("grid");
+const rowFontSizes = Array.from({length: LABELS + 1}, () => ({}));
+const invalidLabels = Array(LABELS + 1).fill(false);
+const FONT_OPTIONS = [10,12,14,16,18,20,22,24,26,28,30];
 
-// UI
-for(let i=1;i<=LABELS;i++){
-  grid.insertAdjacentHTML("beforeend",`
-    <div class="card">
-      <div class="cardHeader">
-        <strong>ORDNER ${i}</strong>
-        <label>Drucken <input type="checkbox" id="p${i}" checked></label>
-      </div>
-
-      <div class="preview">
-        <canvas id="c${i}" width="1152" height="228"></canvas>
-      </div>
-
-      <!-- NUR HIER GEÄNDERT -->
-      <textarea id="h${i}" placeholder="Überschrift (max. 3 Zeilen, ENTER)" oninput="update(${i})"></textarea>
-
-      <textarea id="t${i}" placeholder="Freitext – Linien erscheinen im Druck" oninput="update(${i})"></textarea>
-      <input id="n${i}" placeholder="Nummer unten (z. B. 01)" oninput="update(${i})">
-    </div>
-  `);
-
+// Die bestehende Freitext-Eingabe bleibt erhalten. Jede Eingabezeile
+// hat zusaetzlich einen separat editierbaren Eintrag samt Schriftgroesse.
+for (let i = 1; i <= LABELS; i++) {
+  grid.insertAdjacentHTML("beforeend",
+    '<div class="card">' +
+      '<div class="cardHeader"><strong>ORDNER ' + i + '</strong>' +
+        '<label>Drucken <input type="checkbox" id="p' + i + '" checked></label></div>' +
+      '<div class="preview"><canvas id="c' + i + '" width="1152" height="228"></canvas></div>' +
+      '<textarea id="h' + i + '" placeholder="Überschrift (max. 3 Zeilen, ENTER)" oninput="update(' + i + ')"></textarea>' +
+      '<textarea id="t' + i + '" placeholder="Freitext – jede ENTER-Zeile ist eine Beschriftungszeile" oninput="changeText(' + i + ')"></textarea>' +
+      '<div class="editSettings">' +
+        '<label>Standardschrift <input type="range" id="s' + i + '" min="10" max="30" step="2" value="20" oninput="update(' + i + ')">' +
+          '<output id="sv' + i + '">20 px</output></label>' +
+        '<label>Überschrift <input type="range" id="hs' + i + '" min="16" max="36" step="2" value="28" oninput="update(' + i + ')">' +
+          '<output id="hsv' + i + '">28 px</output></label>' +
+      '</div>' +
+      '<details><summary>Zeilen einzeln bearbeiten / Schriftgröße</summary>' +
+        '<p class="helper">Auto = Standardschrift. Lange Zeilen brechen automatisch um. ' +
+        'Mit | kannst du innerhalb einer Zeile einen Umbruch festlegen.</p>' +
+        '<div id="lines' + i + '"></div></details>' +
+      '<div class="warning" id="warn' + i + '" role="status" hidden></div>' +
+      '<input id="n' + i + '" placeholder="Nummer unten (z. B. 01)" oninput="update(' + i + ')">' +
+    '</div>'
+  );
+  renderRowsEditor(i);
   update(i);
 }
 
-function resetAll(){
-  for(let i=1;i<=LABELS;i++){
-    document.getElementById("h"+i).value="";
-    document.getElementById("t"+i).value="";
-    document.getElementById("n"+i).value="";
-    document.getElementById("p"+i).checked=false;
+function escapeHtml(value) {
+  return String(value).replace(/&/g, "&amp;").replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/'/g, "&#39;");
+}
+
+function renderRowsEditor(i) {
+  const text = document.getElementById("t" + i).value;
+  const rows = text === "" ? [] : text.split("\n");
+  const container = document.getElementById("lines" + i);
+  if (!rows.length) {
+    container.innerHTML = '<p class="helper">Gib zuerst den Freitext ein.</p>';
+    return;
+  }
+  container.innerHTML = rows.map((row, index) => {
+    const chosen = rowFontSizes[i][index] || 0;
+    const options = '<option value="0"' + (!chosen ? ' selected' : '') + '>Auto</option>' +
+      FONT_OPTIONS.map(size => '<option value="' + size + '"' +
+        (chosen === size ? ' selected' : '') + '>' + size + ' px</option>').join("");
+    return '<div class="lineRow"><span class="lineIndex">' + (index + 1) + '</span>' +
+      '<input aria-label="Zeile ' + (index + 1) + '" value="' + escapeHtml(row) +
+      '" oninput="editRow(' + i + ',' + index + ',this.value)">' +
+      '<select aria-label="Schriftgröße Zeile ' + (index + 1) + '"' +
+      ' onchange="setRowSize(' + i + ',' + index + ',this.value)">' + options + '</select></div>';
+  }).join("");
+}
+
+function editRow(i, index, value) {
+  const input = document.getElementById("t" + i);
+  const rows = input.value.split("\n");
+  if (index >= rows.length) return;
+  rows[index] = value.replace(/[\r\n]+/g, " ");
+  input.value = rows.join("\n");
+  update(i);
+}
+
+function setRowSize(i, index, value) {
+  const size = Number(value);
+  if (size) rowFontSizes[i][index] = size;
+  else delete rowFontSizes[i][index];
+  update(i);
+}
+
+function changeText(i) {
+  renderRowsEditor(i);
+  update(i);
+}
+
+function resetAll() {
+  for (let i = 1; i <= LABELS; i++) {
+    document.getElementById("h" + i).value = "";
+    document.getElementById("t" + i).value = "";
+    document.getElementById("n" + i).value = "";
+    document.getElementById("p" + i).checked = false;
+    document.getElementById("s" + i).value = 20;
+    document.getElementById("hs" + i).value = 28;
+    rowFontSizes[i] = {};
+    renderRowsEditor(i);
     update(i);
   }
 }
 
-function update(i){
-  const canvas = document.getElementById("c"+i);
-  const ctx = canvas.getContext("2d");
-
-  drawLabel(
-    ctx,
-    document.getElementById("h"+i).value,
-    document.getElementById("t"+i).value,
-    document.getElementById("n"+i).value
-  );
+function update(i) {
+  const canvas = document.getElementById("c" + i);
+  const standardSize = Number(document.getElementById("s" + i).value);
+  const headingSize = Number(document.getElementById("hs" + i).value);
+  document.getElementById("sv" + i).textContent = standardSize + " px";
+  document.getElementById("hsv" + i).textContent = headingSize + " px";
+  const result = drawLabel(canvas.getContext("2d"),
+    document.getElementById("h" + i).value,
+    document.getElementById("t" + i).value,
+    document.getElementById("n" + i).value,
+    standardSize, headingSize, rowFontSizes[i]);
+  invalidLabels[i] = result.overflow;
+  const warning = document.getElementById("warn" + i);
+  warning.hidden = !result.overflow;
+  warning.textContent = result.overflow ?
+    "Der Text passt nicht vollständig auf das Etikett. Bitte weniger Zeilen oder kleinere Schrift verwenden." : "";
 }
 
-// ZEICHNEN
-function drawLabel(ctx, header, text, number){
-  ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
-  ctx.fillStyle="#fff";
-  ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
+// Breche Wörter an der maximalen Breite um; selbst ein langes
+// Wort ohne Leerzeichen bleibt innerhalb der Etikettenbreite.
+function wrapSingleLine(ctx, line, maxWidth) {
+  const words = line.trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return [""];
+  const out = [];
+  let current = "";
+  for (const word of words) {
+    const candidate = current ? current + " " + word : word;
+    if (ctx.measureText(candidate).width <= maxWidth) {
+      current = candidate;
+      continue;
+    }
+    if (current) { out.push(current); current = ""; }
+    let piece = "";
+    for (const char of word) {
+      if (piece && ctx.measureText(piece + char).width > maxWidth) {
+        out.push(piece);
+        piece = "";
+      }
+      piece += char;
+    }
+    current = piece;
+  }
+  if (current) out.push(current);
+  return out.length ? out : [""];
+}
 
+function wrapRow(ctx, text, size, maxWidth) {
+  ctx.font = size + "px Arial";
+  // "|" erzwingt Umbruch innerhalb einer nummerierten Zeile.
+  return String(text).split("|").flatMap(part => wrapSingleLine(ctx, part, maxWidth));
+}
+
+function drawLabel(ctx, header, text, number, standardSize, headingSize, overrides) {
+  const canvas = ctx.canvas;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.save();
-  ctx.translate(0, ctx.canvas.height);
-  ctx.rotate(-Math.PI/2);
+  ctx.translate(0, canvas.height);
+  ctx.rotate(-Math.PI / 2);
+  ctx.beginPath();
+  ctx.rect(0, 0, canvas.height, canvas.width);
+  ctx.clip();
+  ctx.fillStyle = "#000";
+  ctx.strokeStyle = "#222";
+  ctx.lineWidth = 1;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
 
-  const paddingTop = 10;
-  const paddingBottom = 42;
-  const lineHeight = 34;
-
-  let y = paddingTop;
-
-  // ===== ÜBERSCHRIFT (MAX 3 ZEILEN, UNTEREINANDER) =====
-  if(header){
-    const lines = header.split("\n").slice(0,3);
-
-    ctx.font="bold 28px Arial";
-    ctx.fillStyle="#000";
-    ctx.textBaseline="top";
-
-    for(const line of lines){
-      ctx.fillText(line, 14, y);
-      y += 30;
+  const maxTextWidth = canvas.height - 28;
+  const headerRows = header ? header.split("\n") : [];
+  let overflow = headerRows.length > 3;
+  let y = 10;
+  for (const line of headerRows.slice(0, 3)) {
+    let size = headingSize;
+    ctx.font = "bold " + size + "px Arial";
+    while (size > 9 && ctx.measureText(line).width > maxTextWidth) {
+      size -= 1;
+      ctx.font = "bold " + size + "px Arial";
     }
+    if (ctx.measureText(line).width > maxTextWidth) overflow = true;
+    ctx.fillText(line, 14, y);
+    y += Math.max(30, headingSize + 4);
   }
 
-  // FREITEXT + LINIEN
-  ctx.font="20px Arial";
-  const rows = text.split("\n");
+  const rows = text === "" ? [] : text.split("\n");
+  const contentEnd = canvas.width - 42;
+  const allowedHeight = contentEnd - y;
 
-  const usable = ctx.canvas.width - y - paddingBottom;
-  const maxLines = Math.floor(usable / lineHeight);
-
-  for(let i=0;i<maxLines;i++){
-    if(rows[i]){
-      ctx.fillText(rows[i], 14, y);
-    }
-
-    ctx.beginPath();
-    ctx.moveTo(8, y + lineHeight - 6);
-    ctx.lineTo(ctx.canvas.height - 8, y + lineHeight - 6);
-    ctx.stroke();
-
-    y += lineHeight;
-  }
-
-  // NUMMER UNTEN
-  if(number){
-    ctx.font="bold 22px Arial";
-    ctx.textAlign="center";
-    ctx.fillText(
-      number,
-      ctx.canvas.height / 2,
-      ctx.canvas.width - 28
-    );
-  }
-
-  ctx.restore();
-}
-
-// mm → pt
-const mm = v => v * 2.83465;
-
-// PDF – FESTE POSITION PRO ORDNER
-async function makePDF(){
-  const pdf = await PDFLib.PDFDocument.create();
-  const page = pdf.addPage([595,842]);
-
-  const left = (210-192)/2;
-  const top  = (297-7*38)/2;
-
-  for(let i=1;i<=LABELS;i++){
-    if(!document.getElementById("p"+i).checked) continue;
-
-    const canvas = document.getElementById("c"+i);
-    const img = await pdf.embedPng(canvas.toDataURL("image/png"));
-
-    const slot = i - 1;
-
-    page.drawImage(img,{
-      x: mm(left),
-      y: 842 - mm(top + (slot + 1) * 38),
-      width: mm(192),
-      height: mm(38)
+  function layout(scale) {
+    return rows.map((raw, index) => {
+      const preferred = overrides[index] || standardSize;
+      const size = Math.max(9, Math.round(preferred * scale));
+      const lines = wrapRow(ctx, raw, size, maxTextWidth);
+      const step = size + 4;
+      const height = Math.max(34, lines.length * step + 9);
+      return {size, lines, step, height};
     });
   }
 
-  const bytes = await pdf.save();
-  const blob = new Blob([bytes],{type:"application/pdf"});
-  const url = URL.createObjectURL(blob);
+  let blocks = layout(1);
+  let total = blocks.reduce((sum, block) => sum + block.height, 0);
+  // Lange Texte passen sich erst zeilenweise und bei Bedarf
+  // anschliessend proportional an die verfügbare Etikettenlänge an.
+  for (let scale = 0.95, tries = 0; total > allowedHeight && tries < 28; scale *= 0.95, tries++) {
+    blocks = layout(scale);
+    total = blocks.reduce((sum, block) => sum + block.height, 0);
+  }
+  if (total > allowedHeight) overflow = true;
 
+  for (const block of blocks) {
+    if (y + block.height > contentEnd + 0.5) break;
+    ctx.font = block.size + "px Arial";
+    let lineY = y + 3;
+    for (const line of block.lines) {
+      ctx.fillText(line, 14, lineY);
+      lineY += block.step;
+    }
+    y += block.height;
+    ctx.beginPath();
+    ctx.moveTo(8, y - 6);
+    ctx.lineTo(canvas.height - 8, y - 6);
+    ctx.stroke();
+  }
+
+  // Leere Linien bleiben auf dem Etikett sichtbar.
+  while (y + 34 <= contentEnd) {
+    y += 34;
+    ctx.beginPath();
+    ctx.moveTo(8, y - 6);
+    ctx.lineTo(canvas.height - 8, y - 6);
+    ctx.stroke();
+  }
+
+  if (number) {
+    ctx.font = "bold 22px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(number, canvas.height / 2, canvas.width - 28);
+  }
+  ctx.restore();
+  return {overflow};
+}
+
+// mm -> pt. Layout und A4-PDF bleiben unverändert: 7 x 38 x 192 mm.
+const mm = v => v * 2.83465;
+async function makePDF() {
+  if (typeof PDFLib === "undefined") {
+    alert("PDF-Bibliothek konnte nicht geladen werden. Prüfe die Internetverbindung.");
+    return;
+  }
+  for (let i = 1; i <= LABELS; i++) {
+    if (document.getElementById("p" + i).checked && invalidLabels[i]) {
+      alert("Ordner " + i + ": Text passt nicht vollständig. Bitte Schrift oder Zeilen anpassen.");
+      return;
+    }
+  }
+  const pdf = await PDFLib.PDFDocument.create();
+  const page = pdf.addPage([595,842]);
+  const left = (210 - 192) / 2;
+  const top = (297 - 7 * 38) / 2;
+  for (let i = 1; i <= LABELS; i++) {
+    if (!document.getElementById("p" + i).checked) continue;
+    const canvas = document.getElementById("c" + i);
+    const img = await pdf.embedPng(canvas.toDataURL("image/png"));
+    const slot = i - 1;
+    page.drawImage(img, {
+      x:mm(left), y:842 - mm(top + (slot + 1) * 38),
+      width:mm(192), height:mm(38)
+    });
+  }
+  const bytes = await pdf.save();
+  const blob = new Blob([bytes], {type:"application/pdf"});
+  const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   a.download = "Ordneretiketten_38x192.pdf";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
+
 </script>
 
 </body>
